@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% from "_macros.html" import thumb, swatch %}
+{% block title %}{{ 'Edit product' if editing else 'Add product' }}{% endblock %}
+{% block content %}
+<div class="head">
+  <h1>{{ 'Edit product' if editing else 'Add product' }}</h1>
+  <a class="btn btn-quiet" href="{{ url_for('admin_products.index') }}">Back</a>
+</div>
+{% if not categories %}
+  <p class="empty">There are no categories yet. <a href="{{ url_for('admin_products.categories') }}">Add a category</a> before adding a product.</p>
+{% else %}
+<div class="editor-layout product-editor">
+<form id="product-editor" class="form wide" method="post" enctype="multipart/form-data"
+      action="{{ url_for('admin_products.edit', {product_id: product_id}) if editing else url_for('admin_products.new') }}">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="field-grid">
+    <div class="field span-2">
+      <label for="product_name">Product name</label>
+      <input id="product_name" name="product_name" value="{{ product.product_name or '' }}" maxlength="100" required autofocus>
+    </div>
+    <div class="field span-2">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" rows="3" maxlength="1000" placeholder="Material, fit, care">{{ product.description or '' }}</textarea>
+    </div>
+    <div class="field">
+      <label for="base_price">Price (PHP)</label>
+      <input id="base_price" name="base_price" inputmode="decimal" value="{{ product.base_price or '' }}" required>
+    </div>
+    <div class="field">
+      <label for="category_id">Category</label>
+      <select id="category_id" name="category_id" required>
+        {% for c in categories %}<option value="{{ c.category_id }}" {{ 'selected' if product.category_id|string == c.category_id|string }}>{{ c.category_name }}</option>{% endfor %}
+      </select>
+    </div>
+    {% if editing %}
+      <div class="field">
+        <label for="color">Color of this item</label>
+        <input id="color" name="color" value="{{ product.color or '' }}" maxlength="30" placeholder="Blank if none">
+      </div>
+      <div class="field">
+        <label for="size">Size of this item</label>
+        <input id="size" name="size" value="{{ product.size or '' }}" maxlength="20" placeholder="Blank if none">
+      </div>
+    {% else %}
+      <div class="field">
+        <label for="colors">Colors</label>
+        <input id="colors" name="colors" value="{{ product.colors or '' }}" placeholder="Black, Navy, Sage">
+      </div>
+      <div class="field">
+        <label for="sizes">Sizes</label>
+        <input id="sizes" name="sizes" value="{{ product.sizes or '' }}" placeholder="S, M, L, XL">
+      </div>
+      <p class="field-note span-2">Separate with commas. Leave blank if not needed.</p>
+    {% endif %}
+    {% if editing %}
+      <div class="field span-2">
+        <label>Photos for this color</label>
+        <div class="photo-now">{{ thumb(current.image_id, current.product_name, 'md') }}
+          <a class="btn btn-quiet" href="{{ url_for('admin_products.photos', {product_id: product_id}) }}">Add / manage photos</a>
+        </div>
+      </div>
+    {% else %}
+      <div class="field span-2">
+        <label for="photos">Photos</label>
+        <input id="photos" name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+        <p class="field-note">First photo is the cover. Choose more photos again to add to your selection (up to 8). Shared by every color.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if editing %}
+  <label class="toggle spaced"><input type="checkbox" name="apply_all" value="1" checked><span>Apply to all colors and sizes</span></label>
+  {% endif %}
+
+  <div class="form-actions">
+    <button class="btn" type="submit">{{ 'Save changes' if editing else 'Add product' }}</button>
+    <a class="btn btn-quiet" href="{{ url_for('admin_products.index') }}">Cancel</a>
+  </div>
+</form>
+<aside class="preview-panel" aria-label="Live product preview">
+  <div class="panel-heading"><h2>Live preview</h2><span class="badge">Catalog card</span></div>
+  <div class="preview-cover" id="preview-cover">{% if editing %}{{ thumb(current.image_id, current.product_name, 'detail') }}{% else %}<span>Choose a photo to preview your product</span>{% endif %}</div>
+  <div class="preview-content"><span class="eyebrow" id="preview-category">Category</span>
+    <h2 id="preview-name">Product name</h2><p class="preview-price" id="preview-price">₱0.00</p>
+    <p class="muted" id="preview-description">Your product description will appear here.</p>
+    <div><h3 class="eyebrow">Colors</h3><div class="preview-chips" id="preview-colors"></div></div>
+    <div><h3 class="eyebrow">Sizes</h3><div class="preview-chips" id="preview-sizes"></div></div>
+    <p class="field-note">Preview updates as you type. Save to publish your changes.</p>
+  </div>
+</aside>
+</div>
+
+{% if editing %}
+<h2>Colors and sizes of this product</h2>
+<div class="table-wrap"><table class="table">
+  <thead><tr><th>Color</th><th>Size</th><th class="num">Product ID</th><th class="num">Stock</th><th>Status</th><th class="actions-head">Actions</th></tr></thead>
+  <tbody>{% for v in variants %}
+    <tr class="{{ '' if v.is_active else 'dim' }}">
+      <td>{% if v.color %}<span class="with-swatch">{{ swatch(v.color, 'sm') }}{{ v.color }}</span>{% else %}<span class="muted">No color</span>{% endif %}</td>
+      <td>{% if v.size %}<span class="chip">{{ v.size }}</span>{% else %}<span class="muted">No size</span>{% endif %}
+          {% if v.product_id == product_id %}<span class="muted small"> (editing)</span>{% endif %}</td>
+      <td class="num id-cell">{{ v.product_id }}</td>
+      <td class="num">{{ v.current_stock }}</td>
+      <td><span class="badge {{ 'ok' if v.is_active else '' }}">{{ 'Active' if v.is_active else 'Inactive' }}</span></td>
+      <td class="actions">{% if v.product_id != product_id %}<a class="btn btn-sm btn-quiet" href="{{ url_for('admin_products.edit', {product_id: v.product_id}) }}">Edit</a>{% endif %}
+        <a class="btn btn-sm btn-quiet" href="{{ url_for('inventory.item', {product_id: v.product_id}) }}">Stock</a>
+        <button class="btn btn-sm {{ 'btn-danger' if v.is_active else 'btn-quiet' }}" type="button"
+                data-confirm data-action="{{ url_for('admin_products.set_active', {product_id: v.product_id}) }}"
+                data-title="{{ 'Deactivate this color/size' if v.is_active else 'Reactivate this color/size' }}"
+                data-confirm-label="{{ 'Deactivate' if v.is_active else 'Reactivate' }}"
+                data-danger="{{ '1' if v.is_active else '0' }}"
+                data-fields='{{ {"active": "0" if v.is_active else "1"}|tojson }}'
+                data-message="{{ ('Deactivate ' ~ v.color ~ ' (' ~ v.size ~ ')' ~ '? It leaves the shop and stock stays as it is.') if v.is_active else ('Reactivate ' ~ v.color ~ ' (' ~ v.size ~ ')? It returns to the shop.') }}">{{ 'Deactivate' if v.is_active else 'Reactivate' }}</button></td>
+    </tr>{% endfor %}
+  </tbody>
+</table></div>
+<h2>Add a color or size</h2>
+<form class="toolbar" method="post" action="{{ url_for('admin_products.add_variant', {product_id: product_id}) }}">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <input name="color" placeholder="New color" maxlength="30" aria-label="Color">
+  <input name="size" placeholder="New size" maxlength="20" aria-label="Size">
+  <button class="btn" type="submit">Add</button>
+</form>
+{% endif %}
+{% endif %}
+{% endblock %}

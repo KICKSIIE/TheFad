@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Order #{{ sale.sale_id }}{% endblock %}
+{% block content %}
+<div class="head no-print">
+  <h1>Order #{{ sale.sale_id }}</h1>
+  <div>
+    <button class="btn btn-quiet" type="button" onclick="window.print()">Print receipt</button>
+    <a class="btn btn-quiet" href="{{ url_for('orders.index') }}">All orders</a>
+    <a class="btn" href="{{ url_for('pos.index') }}">New sale</a>
+  </div>
+</div>
+<div class="order-layout">
+<div class="receipt">
+  <header class="receipt-head">
+    <img class="receipt-logo" src="{{ url_for('static', {filename: 'logo-dark.png'}) }}" alt="{{ store.name }}">
+    <p class="receipt-brand">{{ store.name }}</p>
+    <p class="receipt-tag">{{ store.tagline }}</p>
+    <p class="small">{{ store.address }}<br>Plus Code {{ store.plus_code }}</p>
+    <p class="small">Facebook: {{ store.facebook_short }}</p>
+  </header>
+  <div class="receipt-rule"></div>
+  <dl class="receipt-meta">
+    <div><dt>Receipt no.</dt><dd>#{{ sale.sale_id }}</dd></div>
+    <div><dt>Date</dt><dd>{{ sale.sale_date|dt }}</dd></div>
+    <div><dt>Cashier</dt><dd>{{ sale.cashier }}</dd></div>
+    <div><dt>Order</dt><dd>{{ sale.fulfillment_type }}</dd></div>
+    <div><dt>Payment</dt><dd>{{ sale.payment_method }}</dd></div>
+    <div><dt>Status</dt><dd>{{ sale.order_status|label }}</dd></div>
+  </dl>
+  {% if sale.fulfillment_type == 'Delivery' %}
+  <div class="receipt-customer">
+    <p class="receipt-label">Deliver to</p>
+    <p>{{ sale.customer_name }}{% if sale.customer_contact %} &middot; {{ sale.customer_contact }}{% endif %}</p>
+    <p class="small">{{ sale.delivery_address }}</p>
+    {% if sale.rider_service %}<p class="small">Rider: {{ sale.rider_service }}{% if sale.rider_contact %} &middot; {{ sale.rider_contact }}{% endif %}</p>{% endif %}
+  </div>
+  {% elif sale.customer_name %}
+  <div class="receipt-customer"><p class="receipt-label">Customer</p><p>{{ sale.customer_name }}</p></div>
+  {% endif %}
+  <div class="receipt-rule"></div>
+  <div class="receipt-items"><table class="table compact">
+    <thead><tr><th class="num">Product ID</th><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Total</th></tr></thead>
+    <tbody>{% for i in items %}
+      <tr><td class="num id-cell">{{ i.product_id }}</td><td>{{ i.product_name }}{% if i.discount_name %}<div class="muted small">{{ i.discount_name }}</div>{% endif %}{% if i.quantity_refunded %}<div class="warn-text small">{{ i.quantity_refunded }} refunded</div>{% endif %}</td>
+          <td class="num">{{ i.quantity }}</td>
+          <td class="num">{% if i.unit_price_at_sale != i.base_price %}<s class="muted">{{ i.base_price|peso }}</s> {% endif %}{{ i.unit_price_at_sale|peso }}</td>
+          <td class="num">{{ i.line_total|peso }}</td></tr>{% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><td colspan="4">Subtotal</td><td class="num">{{ sale.subtotal|peso }}</td></tr>
+      {% if sale.discount_amount %}<tr><td colspan="4">Promo savings</td><td class="num">-{{ sale.discount_amount|peso }}</td></tr>{% endif %}
+      <tr><td colspan="4"><strong>Total</strong></td><td class="num"><strong>{{ sale.total_amount|peso }}</strong></td></tr>
+    </tfoot>
+  </table></div>
+  <div class="receipt-rule"></div>
+  <footer class="receipt-foot">
+    <p class="receipt-thanks">Thank you for shopping with {{ store.name }}.</p>
+    <p class="small">Questions or sizing help? Message us on Facebook: {{ store.facebook_short }}</p>
+    <p class="small">{{ store.address }}</p>
+  </footer>
+</div>
+
+<aside class="order-sidebar no-print">
+<section class="panel order-summary"><span class="eyebrow">Order overview</span><h2>{{ sale.order_status|label }}</h2><dl class="summary-list"><div><dt>Total</dt><dd>{{ sale.total_amount|peso }}</dd></div><div><dt>Payment</dt><dd>{{ sale.payment_method }}</dd></div><div><dt>Fulfillment</dt><dd>{{ sale.fulfillment_type }}</dd></div><div><dt>Cashier</dt><dd>{{ sale.cashier }}</dd></div></dl></section>
+<section class="panel"><h2>Order actions</h2>
+{% if sale.order_status in ['Pending', 'Out_for_Delivery'] %}
+  <p class="muted small">Update delivery details and order status.</p>
+  {% if sale.order_status == 'Pending' and sale.fulfillment_type == 'Delivery' %}
+  <form class="order-update" method="post" action="{{ url_for('orders.set_status', {sale_id: sale.sale_id}) }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <input type="hidden" name="new_status" value="Out_for_Delivery">
+    <label for="rider-service">Rider service</label><input id="rider-service" name="rider_service" placeholder="Rider service (e.g. Lalamove)" maxlength="50" required>
+    <label for="rider-contact">Rider contact</label><input id="rider-contact" name="rider_contact" placeholder="Rider contact number" maxlength="20" required>
+    <button class="btn" type="submit">Send out for delivery</button>
+  </form>
+  {% endif %}
+  <div class="toolbar">
+  {% if sale.order_status == 'Out_for_Delivery' %}
+  <form method="post" action="{{ url_for('orders.set_status', {sale_id: sale.sale_id}) }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="new_status" value="Completed">
+    <button class="btn" type="submit">Mark delivered</button>
+  </form>
+  {% endif %}
+  <form method="post" action="{{ url_for('orders.set_status', {sale_id: sale.sale_id}) }}" onsubmit="return confirm('Cancel this order and return the stock?');">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="new_status" value="Cancelled">
+    <button class="btn btn-quiet" type="submit">Cancel order</button>
+  </form>
+  </div>
+{% endif %}
+{% if current_user.role == 'Admin' and sale.order_status in ['Completed', 'Partially_Refunded'] %}
+  <p><a class="btn btn-quiet" href="{{ url_for('refunds.sale', {sale_id: sale.sale_id}) }}">Refund items from this order</a></p>
+{% endif %}
+
+</section></aside></div>
+{% endblock %}

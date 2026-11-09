@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Not built yet{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>Backend not built yet</h1>
+  <p><strong>{{ feature }}</strong> is assigned to <strong>{{ owner }}</strong>.</p>
+  <table class="table">
+    <tbody>
+      <tr><th scope="row">Route</th><td><code>{{ method }} {{ path }}</code></td></tr>
+      <tr><th scope="row">Endpoint</th><td><code>{{ endpoint }}</code></td></tr>
+      <tr><th scope="row">Database routines</th><td>{{ routines }}</td></tr>
+      <tr><th scope="row">Screen template</th><td><code>templates/{{ template }}</code></td></tr>
+    </tbody>
+  </table>
+  <p class="muted">Replace this stub in your own folder under <code>backend/</code>. See <code>docs/WORKFLOW.md</code>.</p>
+</section>
+{% endblock %}

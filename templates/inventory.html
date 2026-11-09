@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Inventory{% endblock %}
+{% block content %}
+<div class="head">
+  <h1>Inventory</h1>
+  <div><a class="btn btn-quiet" href="{{ url_for('inventory.history') }}">Stock history</a></div>
+</div>
+<form class="toolbar" method="get">
+  <input type="search" name="q" placeholder="Search products" value="{{ q }}">
+  <select name="category" aria-label="Category">
+    <option value="">All categories</option>
+    {% for c in categories %}<option value="{{ c }}" {{ 'selected' if category == c }}>{{ c }}</option>{% endfor %}
+  </select>
+  <label class="field-inline">Low means <span class="muted">at or below</span>
+    <input type="number" name="max" min="0" value="{{ limit }}" class="narrow" aria-label="Low stock level"></label>
+  <label class="toggle"><input type="checkbox" name="low" value="1" {{ 'checked' if low_only }}><span>Low stock only</span></label>
+  <button class="btn" type="submit">Filter</button>
+  {% if q or category or low_only %}<a class="btn btn-quiet" href="{{ url_for('inventory.index') }}">Clear</a>{% endif %}
+</form>
+{% if items %}
+<div class="table-wrap"><table class="table">
+  <thead><tr><th>Product</th><th class="num">Product ID</th><th>Category</th><th class="num">In stock</th><th class="actions-head">Actions</th></tr></thead>
+  <tbody>
+  {% for i in items %}
+    <tr class="{{ '' if i.is_active else 'dim' }}">
+      <td class="product-cell">{{ i.product_name }}{% if not i.is_active %} <span class="badge">Inactive</span>{% endif %}</td>
+      <td class="num id-cell">{{ i.product_id }}</td>
+      <td>{{ i.category_name }}</td>
+      <td class="num">{{ i.current_stock }}{% if i.current_stock == 0 %} <span class="badge warn">Out</span>{% elif i.is_low %} <span class="badge warn">Low</span>{% endif %}</td>
+      <td class="actions"><a class="btn btn-sm btn-quiet" href="{{ url_for('inventory.item', {product_id: i.product_id}) }}">Manage</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}
+  <p class="empty">{{ 'No products match these filters.' if (q or category or low_only) else 'No products yet. Add a product first.' }}</p>
+{% endif %}
+{% endblock %}

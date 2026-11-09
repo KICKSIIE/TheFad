@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "_macros.html" import thumb, swatch %}
+{% block title %}Products{% endblock %}
+{% block content %}
+<div class="head">
+  <h1>Products</h1>
+  <div>
+    <a class="btn btn-quiet" href="{{ url_for('admin_products.categories') }}">Categories</a>
+    <a class="btn" href="{{ url_for('admin_products.new') }}">Add product</a>
+  </div>
+</div>
+<form class="toolbar" method="get">
+  {% if variants_view %}<input type="hidden" name="variants" value="1">{% endif %}
+  <input type="search" name="q" placeholder="Search name, color, size" value="{{ q }}">
+  <select name="category" aria-label="Category">
+    <option value="">All categories</option>
+    {% for c in categories %}<option value="{{ c.category_id }}" {{ 'selected' if category == c.category_id }}>{{ c.category_name }}</option>{% endfor %}
+  </select>
+  <label class="toggle"><input type="checkbox" name="inactive" value="1" {{ 'checked' if show_inactive }}><span>Show inactive</span></label>
+  <button class="btn btn-quiet" type="submit">Filter</button>
+</form>
+<p class="view-toggle muted">
+  {% if variants_view %}Every color and size &middot;
+  <a href="{{ url_for('admin_products.index', {q: q or None, category: category, inactive: '1' if show_inactive else None}) }}">Group by product</a>
+  {% else %}One row per product &middot;
+  <a href="{{ url_for('admin_products.index', {q: q or None, category: category, inactive: '1' if show_inactive else None, variants: '1'}) }}">Show every color and size</a>
+  {% endif %}</p>
+{% if products and not variants_view %}
+<div class="table-wrap"><table class="table">
+  <thead><tr><th></th><th>Product</th><th class="num">Product ID</th><th>Colors</th><th>Sizes</th><th class="num">Price</th><th class="num">Stock</th><th>Discount</th><th>Status</th><th class="actions-head">Actions</th></tr></thead>
+  <tbody>
+  {% for c in cards %}
+    {% set off = c.rows|rejectattr('is_active')|list|length %}
+    {% set ids = c.rows|map('product_id')|list %}
+    <tr>
+      <td class="thumb-cell">{{ thumb(c.image_id, c.name, 'sm') }}</td>
+      <td class="product-cell">{{ c.name }}<div class="muted small">{{ c.category }}, {{ c.rows|length }} item{{ '' if c.rows|length == 1 else 's' }}</div></td>
+      <td class="num id-cell">{{ ids|min }}{% if ids|max != ids|min %}&ndash;{{ ids|max }}{% endif %}</td>
+      <td><span class="color-dots">{% for col in c.colors %}{{ swatch(col.name, 'md') }}{% else %}<span class="muted">None</span>{% endfor %}</span></td>
+      <td class="sizes-cell"><span class="size-list">{% for sz in c.sizes %}<span class="chip {{ 'out' if sz.stock == 0 else '' }}">{{ sz.size }}</span>{% else %}<span class="muted">None</span>{% endfor %}</span></td>
+      <td class="num">{% if c.promo %}<s class="muted">{{ c.base_min|peso }}</s> {% endif %}{% if c.price_min != c.price_max %}From {% endif %}{{ c.price_min|peso }}</td>
+      <td class="num">{{ c.stock }}{% if c.status == 'out' %} <span class="badge warn">Out</span>{% elif c.status == 'low' %} <span class="badge warn">Low</span>{% endif %}</td>
+      <td>{% if c.promo %}<span class="badge promo">{{ c.promo.discount_percentage }}% off</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if off == c.rows|length %}<span class="badge">Inactive</span>{% else %}<span class="badge ok">Active</span>{% if off %} <span class="badge">{{ off }} inactive</span>{% endif %}{% endif %}</td>
+      <td class="actions"><a class="btn btn-sm btn-quiet" href="{{ url_for('admin_products.edit', {product_id: c.first_id}) }}">Edit</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% elif products %}
+
+<div class="table-wrap"><table class="table">
+  <thead><tr><th></th><th>Product</th><th class="num">Product ID</th><th>Color</th><th>Size</th><th>Category</th><th class="num">Price</th><th class="num">Stock</th><th>Discount</th><th>Status</th><th class="actions-head">Actions</th></tr></thead>
+  <tbody>
+  {% for p in products %}
+    <tr class="{{ '' if p.is_active else 'dim' }}">
+      <td class="thumb-cell">{{ thumb(p.image_id, p.product_name, 'sm') }}</td>
+      <td class="product-cell">{{ p.product_name }}</td>
+      <td class="num id-cell">{{ p.product_id }}</td>
+      <td>{% if p.color %}<span class="with-swatch">{{ swatch(p.color, 'sm') }}{{ p.color }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if p.size %}<span class="chip">{{ p.size }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{{ p.category_name }}</td>
+      <td class="num">{% if p.discount_name %}<s class="muted">{{ p.base_price|peso }}</s> {% endif %}{{ p.current_price|peso }}</td>
+      <td class="num">{{ p.current_stock }}{% if p.current_stock == 0 %} <span class="badge warn">Out</span>{% elif p.current_stock <= low_stock_limit %} <span class="badge warn">Low</span>{% endif %}</td>
+      <td>{% if p.discount_name %}<span class="badge promo">{{ p.discount_percentage }}% off</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td><span class="badge {{ 'ok' if p.is_active else '' }}">{{ 'Active' if p.is_active else 'Inactive' }}</span></td>
+      <td class="actions">
+        <a class="btn btn-sm btn-quiet" href="{{ url_for('admin_products.edit', {product_id: p.product_id}) }}">Edit</a>
+        <button class="btn btn-sm {{ 'btn-danger' if p.is_active else 'btn-quiet' }}" type="button"
+                data-confirm data-action="{{ url_for('admin_products.set_active', {product_id: p.product_id}) }}"
+                data-title="{{ 'Deactivate item' if p.is_active else 'Reactivate item' }}"
+                data-confirm-label="{{ 'Deactivate' if p.is_active else 'Reactivate' }}"
+                data-danger="{{ '1' if p.is_active else '0' }}"
+                data-fields='{{ {"active": "0" if p.is_active else "1"}|tojson }}'
+                data-message="{{ ('Deactivate ' ~ p.product_name ~ (' - ' ~ p.color if p.color else '') ~ (' (' ~ p.size ~ ')' if p.size else '') ~ '? This color/size leaves the shop.') if p.is_active else ('Reactivate this color/size? It returns to the shop.') }}">{{ 'Deactivate' if p.is_active else 'Reactivate' }}</button>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}
+  <p class="empty">No products found. Add a category first, then add your first product.</p>
+{% endif %}
+{% endblock %}

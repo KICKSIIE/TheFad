@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit promo' if editing else 'Create promo' }}{% endblock %}
+{% block content %}
+<div class="head">
+  <h1>{{ 'Edit promo' if editing else 'Create promo' }}</h1>
+  <a class="btn btn-quiet" href="{{ url_for('admin_promos.index') }}">Back</a>
+</div>
+<div class="editor-layout">
+<form id="promo-editor" class="form wide" method="post" action="{{ url_for('admin_promos.edit', {discount_id: discount_id}) if editing else url_for('admin_promos.new') }}">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="field-grid">
+    <div class="field">
+      <label for="discount_name">Promo name</label>
+      <input id="discount_name" name="discount_name" value="{{ promo.discount_name or '' }}" maxlength="100" required>
+    </div>
+    <div class="field">
+      <label for="discount_percentage">Discount percent</label>
+      <input id="discount_percentage" name="discount_percentage" type="number" min="1" max="99" placeholder="1 to 99" value="{{ promo.discount_percentage or '' }}" required>
+    </div>
+    <div class="field">
+      <label for="start_date">Starts</label>
+      <input id="start_date" name="start_date" type="date" value="{{ promo.start_date.isoformat() if promo.start_date and promo.start_date.isoformat else (promo.start_date or today.isoformat()) }}" required>
+    </div>
+    <div class="field">
+      <label for="end_date">Ends</label>
+      <input id="end_date" name="end_date" type="date" value="{{ promo.end_date.isoformat() if promo.end_date and promo.end_date.isoformat else (promo.end_date or '') }}" required>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn" type="submit">{{ 'Save changes' if editing else 'Create promo' }}</button>
+    <a class="btn btn-quiet" href="{{ url_for('admin_promos.index') }}">Cancel</a>
+  </div>
+</form>
+<aside class="panel promo-products-panel" aria-labelledby="promo-products-title">
+  <span class="eyebrow">Product coverage</span>
+  <h2 id="promo-products-title">Add this promo to products</h2>
+  {% if not editing %}
+  <p class="muted small">Choose where this promo applies when you create it.</p>
+  <div class="field">
+    <label for="scope">Apply to</label>
+    <select id="scope" name="scope" form="promo-editor" data-promo-scope>
+      <option value="NONE" {{ 'selected' if promo.scope == 'NONE' }}>No products yet</option>
+      <option value="PRODUCT" {{ 'selected' if promo.scope == 'PRODUCT' }}>One product</option>
+      <option value="STORE" {{ 'selected' if promo.scope == 'STORE' }}>Whole store</option>
+    </select>
+  </div>
+  <div class="field promo-product-field">
+    <label for="product_id">Product</label>
+    <select id="product_id" name="product_id" form="promo-editor">
+      {% for p in products %}<option value="{{ p.product_id }}" {{ 'selected' if promo.product_id|string == p.product_id|string }}>{{ p.name }}</option>{% endfor %}
+    </select>
+  </div>
+  {% elif promo.status == 'Active' %}
+  <p class="muted small">Apply this active promo to a product or the whole store. Save changes to the promo details first.</p>
+  <form method="post" action="{{ url_for('admin_promos.apply', {discount_id: discount_id}) }}">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="field"><label for="apply-scope">Apply to</label>
+      <select id="apply-scope" name="scope" data-promo-scope>
+        <option value="PRODUCT">One product</option><option value="STORE">Whole store</option>
+      </select>
+    </div>
+    <div class="field promo-product-field"><label for="apply-product">Product</label>
+      <select id="apply-product" name="product_id">{% for p in products %}<option value="{{ p.product_id }}">{{ p.name }}</option>{% endfor %}</select>
+    </div>
+    <button class="btn" type="submit">Apply promo</button>
+  </form>
+  {% else %}
+  <p class="muted small">Products can be added when this promo is active.</p>
+  {% endif %}
+</aside></div>
+
+{% if editing %}
+<h2>Products on this promo</h2>
+{% if linked %}
+<div class="table-wrap"><table class="table">
+  <thead><tr><th>Product</th><th class="num">Items</th><th class="num">Normal price</th><th class="num">Promo price</th><th class="actions-head">Actions</th></tr></thead>
+  <tbody>{% for p in linked %}
+    <tr><td>{{ p.name }}</td><td class="num">{{ p.variants }}</td><td class="num">{{ p.base|peso }}</td><td class="num">{{ p.promo|peso }}</td>
+      <td class="actions">
+        <button class="btn btn-sm btn-danger" type="button"
+                data-confirm data-action="{{ url_for('admin_promos.unlink', {product_id: p.product_id}) }}"
+                data-title="Remove from promo" data-confirm-label="Remove" data-danger="1"
+                data-message="Remove {{ p.name }} from this promo? Its prices go back to normal.">Remove</button>
+      </td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% else %}<p class="empty">No products are on this promo.</p>{% endif %}
+
+{% endif %}
+{% endblock %}
